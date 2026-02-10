@@ -1,0 +1,177 @@
+---
+title: "Homework 2: Initial Submission"
+author: "Mathew Kang"
+format: 
+  pdf:
+    mainfont: "Arial"
+    geometry:
+      - margin=1in
+---
+
+# Question 1
+
+The distribution of plan counts by county is visualized in @fig-plan-counts, where the median of the plan count is shown to increase over time: 
+
+```{r}
+#| label: fig-plan-counts
+#| fig-cap: "Distribution of Plan Counts per County (2014-2019)"
+#| warning: false
+#| echo: false
+
+# Load tidyverse
+library(tidyverse)
+# Load dataset
+final_ma <- read_csv("../../data/output/final_ma.csv")
+
+# Recreate the summary object
+plot_data_q1 <- final_ma %>%
+  group_by(fips, year) %>%
+  summarize(plan_count = n_distinct(planid), .groups = "drop")
+
+# Your plotting code here
+ggplot(plot_data_q1, aes(x = as.factor(year), y = plan_count)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Plan Counts per County (2014-2019)",
+       x = "Year", y = "Number of Plans") +
+  theme_minimal(base_family = "sans") + 
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 11)
+  )
+```
+
+An increase in the median of insurers up to about 20 insurers per county in 2019 would suggest that the market competition is **sufficient** for beneficiaries to select from a wide variety of plans with various benefits, premiums, and provider networks. More insurers and lower concentration also leads to lower cost-sharing prices and smaller markups that generally favor enrollees.
+
+However, based on the distribution, arguments for beneficiaries in a given county having too many or too few plans can also be justified. For instance, many counties across all six years have access to over 50 plans, with the number of these "outlier" counties increasing over time. Especially for elderly and disabled cohorts that utilize Medicare Advantage (MA), it is often impossible to select from a large catalog of plans that best fits their financial and health circumstances. Beneficiaries are, thus, highly vulnerable to defaulting towards a low-value plan that is not well-informed, despite the large number of plans ostensibly providing a greater freedom of choice.
+
+Conversely, while this has improved over the years, some counties have less than 10 plans, represented by the lower quartiles of the plots. This may reflect a geographical disparity in the availability of insurers, as beneficiaries residing in rural areas tend to have less access to both health insurance plans and providers compared to urban dwellers. Nevertheless, more data analysis is necessary to support this conclusion.
+
+# Question 2
+
+The distribution of MA plan bids is shown in @fig-bid-histogram:
+
+```{r}
+#| label: fig-bid-histogram
+#| fig-cap: "Distribution of Medicare Advantage Bids (2014 vs 2018)"
+#| warning: false
+#| echo: false
+
+# Load tidyverse
+library(tidyverse)
+# Load dataset
+final_ma <- read_csv("../../data/output/final_ma.csv")
+
+# Filter data to only include 2014 and 2018
+plot_data_q2 <- final_ma %>%
+  filter(year %in% c(2014, 2018)) %>%
+  filter(!is.na(bid))
+
+# Your plotting code here
+ggplot(plot_data_q2, aes(x = bid)) +
+  geom_histogram(fill = "darkblue", color = "white", bins = 50) +
+  facet_wrap(~year) +
+  labs(
+    title = "Distribution of Medicare Advantage Bids",
+    x = "Bid Amount ($)",
+    y = "Frequency (Count of Plans)"
+  ) +
+  theme_minimal(base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 11)
+  )
+```
+
+When comparing the distributions between 2014 and 2018, it is remarkably clear that there are more plans in total in 2018 compared to 2014. This supports the previous assertion that the plan count has increased over time.
+
+Another shift to note is that the peak of the distribution shifted slightly to the left in 2018 compared to 2014. This may signal that, as more plans entered the market, insurers felt the pressure of market competition to lower their bids, increasing the difference from the benchmark to offer higher rebates to beneficiaries.
+
+Lastly, the distribution of bids in 2018 is narrower compared to 2014, indicating that the health insurance market may be shifting closer to efficiency as insurers standardize their bids and, subsequently, the benefits they provide to enrollees to stay competitive.
+
+# Question 3
+
+```{r}
+#| label: fig-hhi-line
+#| fig-cap: "Average Market Concentration (HHI) Over Time (2014-2019)"
+#| warning: false
+#| echo: false
+
+# Load tidyverse
+library(tidyverse)
+# Load dataset
+final_ma <- read_csv("../../data/output/final_ma.csv")
+
+#Calculate HHI
+hhi_data <- final_ma %>%
+  # Sum enrollment by parent org per county
+  group_by(fips, year, parent_org) %>%
+  summarize(org_enrollment = sum(avg_enrollment, na.rm = TRUE), .groups = "drop_last") %>%
+  # MA share (%): dividing org enrollment by total county enrollment
+  mutate(county_enrollment = sum(org_enrollment, na.rm = TRUE),
+         market_share = (org_enrollment/county_enrollment) * 100) %>%
+  # Competition: HHI = sum of squared MA shares
+  summarize(hhi_ma = sum(market_share^2, na.rm = TRUE), .groups = "drop")
+
+
+# Timeline of average HHI for all counties per year -----------------------
+hhi_timeline <- hhi_data %>%
+  group_by(year) %>%
+  summarize(avg_hhi = mean(hhi_ma, na.rm = TRUE))
+
+# Plot the data -----------------------------------------------------------
+ggplot(hhi_timeline, aes(x = year, y = avg_hhi)) +
+  geom_line(color = "darkblue", size = 1) +
+  geom_point(size = 3) +
+  labs(title = "Average Market Concentration (HHI) Over Time",
+       x = "Year", y = "Average HHI") +
+  theme_minimal(base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 11)
+  )
+```
+
+As mentioned in class, the Herfindahl-Hirschman Index (HHI) measures market concentration, with 0 representing perfect competition and 10,000 representing a complete monopoly.
+
+Based on @fig-hhi-line, the average  HHI across all counties remained stable at about 5,270 from 2014 to 2016, indicating that the health insurance market was highly concentrated and structured oligopolistically (a few large insurers dominate the industry). The average HHI began to decrease in 2016, with the largest decrease taking place between 2018 (5,166) and 2019 (4,910).
+
+{{< pagebreak >}}
+
+# Question 4
+
+```{r}
+#| label: fig-share-line
+#| fig-cap: "Medicare Advantage Share Over Time (2014-2019)"
+#| warning: false
+#| echo: false
+
+# Load tidyverse
+library(tidyverse)
+# Load dataset
+final_ma <- read_csv("../../data/output/final_ma.csv")
+
+# Calculate the MA share per year -----------------------------------------
+ma_percent <- final_ma %>%
+  group_by(year) %>%
+  summarize(
+    total_enrolled = sum(avg_enrolled, na.rm = TRUE),
+    total_eligibles = sum(avg_eligibles, na.rm = TRUE)
+  ) %>%
+  mutate(ma_share = (total_enrolled/total_eligibles) * 100)
+
+
+# Plot trend --------------------------------------------------------------
+ggplot(ma_percent, aes(x = year, y = ma_share)) +
+  geom_line(color = "darkblue", size = 1.2) +
+  geom_point(size = 3) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  labs(title = "Medicare Advantage Share Over Time",
+       x = "Year", y = "MA Share of Total Eligibles") +
+  theme_minimal(base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 11)
+  )
+```
+
+According to @fig-share-line, the average share of MA enrollees compared to all Americans that are eligible for Medicare increased from 36.8% in 2014 to 43.3% in 2019.
