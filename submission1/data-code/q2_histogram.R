@@ -19,13 +19,14 @@ plot_data_q2 <- final_ma %>%
 
 
 # Create frequency histograms side-by-side --------------------------------
-ggplot(plot_data_q2, aes(x = bid)) +
-  geom_histogram(fill = "darkblue", color = "white", bins = 50) +
-  facet_wrap(~year) +
+ggplot(plot_data_q2, aes(x = bid, fill = as.factor(year))) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 50, color = "white") +
+  scale_fill_manual(values = c("2014" = "darkblue", "2018" = "darkorange")) +
   labs(
     title = "Distribution of Medicare Advantage Bids",
     x = "Bid Amount ($)",
-    y = "Frequency (Count of Plans)"
+    y = "Frequency (Count of Plans)",
+    fill = "Year"
   ) +
   theme_minimal(base_family = "sans")
 

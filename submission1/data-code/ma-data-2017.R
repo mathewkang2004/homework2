@@ -283,6 +283,10 @@ state.2017 <- ma.2017 %>%
   group_by(state) %>%
   summarize(state_name = last(state_long[!is.na(state_long)]), .groups = "drop")
 
+ma.2017 <- ma.2017 %>%
+  mutate(year = coalesce(as.numeric(year.x), as.numeric(year.y), 2017)) %>%
+  select(-starts_with("year."))
+
 full.2017 <- ma.2017 %>%
   left_join(state.2017, by = "state") %>%
   left_join(landscape.2017 %>% mutate(state=str_to_lower(state)), by = c("contractid","planid","state_name" = "state","county")) %>%
@@ -298,7 +302,21 @@ full.2017 <- ma.2017 %>%
       rebate_partc > 0  | basic_premium == 0 ~  payment_partc / riskscore_partc,
       TRUE ~ NA_real_
     )
+  ) %>%
+  left_join(ffscosts.2017 %>% select(-state) %>% filter(!is.na(ssa)), by = c("ssa","year")) %>%
+  mutate(
+    avg_ffscost = case_when(
+      parta_enroll == 0 & partb_enroll == 0 ~ 0,
+      parta_enroll == 0 & partb_enroll >  0 ~ partb_reimb / partb_enroll,
+      parta_enroll >  0 & partb_enroll == 0 ~ parta_reimb / parta_enroll,
+      parta_enroll >  0 & partb_enroll >  0 ~ (parta_reimb / parta_enroll) + (partb_reimb / partb_enroll),
+      TRUE ~ NA_real_
+    )
   )
+
+full.2017 <- full.2017 %>%
+  mutate(year = coalesce(as.numeric(year.x), as.numeric(year.y), 2017)) %>%
+  select(-starts_with("year."))
 
 # Save data ---------------------------------------------------------------
 write_csv(full.2017,"data/output/data-2017.csv")
