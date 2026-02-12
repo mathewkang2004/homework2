@@ -374,14 +374,6 @@ treatment_comparison %>%
   knitr::kable(caption = "Table for Question 7: Comparison of ATE Estimators")
 ```
 
-# Question 8
-
-The results for IPW Weighting and simple linear regression with the appropriate interactions are identical in that the average treatment effect (ATE) is -$19.55, which suggests that, on average, plans in uncompetitive markets submit bids that are \$19.55 less than plans in competitive markets.
-
-While counterintuitive at first glance, this may indicate that insurers in uncompetitive markets have more market power to keep bids low in order to maximize rebates, attracting more beneficiaries in the process.
-
-Table 2 tells a different story, where the raw averages indicate that plans in competitive markets tend to submit lower bids compared to plans in uncompetitive markets. However, this is likely due to selection bias. For instance, if uncompetitive counties consistently have higher, underlying medical costs or fewer beneficiaries than competitive counties, then average bids for uncompetitive counties will be higher.
-
 # Question 9
 
 ```{r}
@@ -406,7 +398,3 @@ knitr::kable(q9_comparison,
              caption = "Sensitivity Analysis: Quartile vs. Continuous Controls",
              row.names = FALSE)
 ```
-
-# Question 10
-
-Overall, I thought that the process of visualizing data was very fun. Seeing the plots being rendered through code when I typically use default plots from excel was delightful and I'm excited to see what the other homeworks have in store for me in the future. One thing I learned, conceptually, was HHI. I've heard about it for the first time in class, where I later learned about market concentration and how that affects competition as well. Seeing that HHI decreases as the number of insurers increases by year from question 3 helped to create a more comprehensive story with the data. One thing that surprised me that, frankly, I'm still trying to figure out is the ATE estimators from question 7 showing that uncompetitive markets submit lower bids, on average, than competitive markets. Perhaps this is due to efficiency or increased market power from having few firms, but I expected higher bids in uncompetitive markets since fewer firms, paradoxically, have higher market power to inflate prices.
