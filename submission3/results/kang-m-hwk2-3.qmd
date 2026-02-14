@@ -1,5 +1,5 @@
 ---
-title: "Homework 2: Revision Submission"
+title: "Homework 2: Submission 3"
 author: "Mathew Kang"
 execute:
   echo: false
@@ -11,6 +11,16 @@ format:
       - margin=1in
 ---
 
+```{r}
+
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, stringr, readxl, data.table, gdata, scales, kableExtra, knitr, modelsummary)
+
+# Load dataset
+final_ma <- read_csv("../../data/output/final_ma.csv")
+
+```
+
 # Question 1
 
 The distribution of plan counts by county is visualized in @fig-plan-counts, where the median of the plan count is shown to increase over time: 
@@ -18,13 +28,6 @@ The distribution of plan counts by county is visualized in @fig-plan-counts, whe
 ```{r}
 #| label: fig-plan-counts
 #| fig-cap: "Distribution of Plan Counts per County (2014-2019)"
-#| warning: false
-#| echo: false
-
-# Load tidyverse
-library(tidyverse)
-# Load dataset
-final_ma <- read_csv("../../data/output/final_ma.csv")
 
 # Recreate the summary object
 plot_data_q1 <- final_ma %>%
@@ -57,13 +60,6 @@ The distribution of MA plan bids is shown in @fig-bid-histogram:
 ```{r}
 #| label: fig-bid-histogram
 #| fig-cap: "Distribution of Medicare Advantage Bids (2014 vs 2018)"
-#| warning: false
-#| echo: false
-
-# Load tidyverse
-library(tidyverse)
-# Load dataset
-final_ma <- read_csv("../../data/output/final_ma.csv")
 
 # Filter data to only include 2014 and 2018
 plot_data_q2 <- final_ma %>%
@@ -98,13 +94,6 @@ Lastly, the distribution of bids in 2018 is narrower compared to 2014, indicatin
 ```{r}
 #| label: fig-hhi-line
 #| fig-cap: "Average Market Concentration (HHI) Over Time (2014-2019)"
-#| warning: false
-#| echo: false
-
-# Load tidyverse
-library(tidyverse)
-# Load dataset
-final_ma <- read_csv("../../data/output/final_ma.csv")
 
 #Calculate HHI
 hhi_data <- final_ma %>%
@@ -138,22 +127,15 @@ ggplot(hhi_timeline, aes(x = year, y = avg_hhi)) +
 
 As mentioned in class, the Herfindahl-Hirschman Index (HHI) measures market concentration, with 0 representing perfect competition and 10,000 representing a complete monopoly.
 
-Based on @fig-hhi-line, the average  HHI across all counties remained stable at about 5,270 from 2014 to 2016, indicating that the health insurance market was highly concentrated and structured oligopolistically (a few large insurers dominate the industry). The average HHI began to decrease in 2016, with the largest decrease taking place between 2018 (5,166) and 2019 (4,910).
+Based on @fig-hhi-line, the average  HHI across all counties remained stable at about 5,270 from 2014 to 2016, indicating that the health insurance market was highly concentrated and structured oligopolistically (a few large insurers dominate the industry). The average HHI began to decrease in 2016, with the largest decrease taking place between 2018 (5,166) and 2019 (4,910). However, it is important to note that the national health insurance market is still highly concentrated across all years, with the average HHI consistently staying above the Federal Trade Commission's (FTC) threshold for "highly concentrated" markets of 2,500.
 
-{{< pagebreak >}}
+\newpage
 
 # Question 4
 
 ```{r}
 #| label: fig-share-line
 #| fig-cap: "Medicare Advantage Share Over Time (2014-2019)"
-#| warning: false
-#| echo: false
-
-# Load tidyverse
-library(tidyverse)
-# Load dataset
-final_ma <- read_csv("../../data/output/final_ma.csv")
 
 # Calculate the MA share per year -----------------------------------------
 ma_percent <- final_ma %>%
@@ -179,28 +161,29 @@ ggplot(ma_percent, aes(x = year, y = ma_share)) +
   )
 ```
 
-According to @fig-share-line, the average share of MA enrollees compared to all Americans that are eligible for Medicare increased from 36.8% in 2014 to 43.3% in 2019.
+According to @fig-share-line, the average share of MA enrollees compared to all Americans that are eligible for Medicare increased from 36.8% in 2014 to 43.3% in 2019, indicating that MA has become more popular for Medicare eligibles over the years.
 
 # Question 5
 
 ```{r}
 #| label: tbl-bid-comparison
-#| tbl-cap: "Mean Medicare Advantage Bids by HHI (2018)"
-#| warning: false
-#| echo: false
-
-library(knitr)
+#| tbl-cap: "Mean Medicare Advantage Bids, FFS Costs, and Medicare Eligibles by HHI (2018)"
 
 # Filter for 2018 and calculate HHI 
-hhi_2018 <- final_ma %>%
+hhi_2018 <- final_ma %>% 
   filter(year == 2018) %>%
   group_by(fips) %>%
   mutate(
-    county_enrollment = sum(avg_enrollment, na.rm = TRUE),
-    ma_share = (avg_enrollment/county_enrollment) * 100) %>%
-  summarize(hhi = sum(ma_share^2),
-            avg_bid = mean(bid, na.rm = TRUE)
-  )
+    ma_share = if_else(avg_enrolled > 0, (avg_enrollment / avg_enrolled) * 100, NA_real_)
+  ) %>%
+  summarize(
+    hhi = sum(ma_share^2, na.rm = TRUE),
+    bid = mean(bid, na.rm = TRUE),
+    avg_ffscost = mean(avg_ffscost, na.rm = TRUE),
+    avg_eligibles = mean(avg_eligibles, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(!is.na(bid), !is.na(avg_ffscost), !is.na(avg_eligibles))
 
 
 # Quantiles of HHI 
@@ -209,192 +192,239 @@ q_hhi <- quantile(hhi_2018$hhi, probs = c(0.33, 0.66), na.rm = TRUE)
 
 # Define treatment: high (33rd) vs low HHI (66th)
 bid_comparisons <- hhi_2018 %>%
-  mutate(market_type = case_when(
-    hhi <= q_hhi[1] ~ "Competitive (Low HHI)",
-    hhi >= q_hhi[2] ~ "Uncompetitive (High HHI)",
-    TRUE ~ "Middle"
+  mutate(
+    hhi_group = case_when(
+      hhi >= q_hhi[2] ~ "Uncompetitive (High HHI)", # treated
+      hhi <= q_hhi[1] ~ "Competitive (Low HHI)", # control
+      TRUE ~ NA_character_
+    ),
+    treated = case_when(
+    hhi_group == "Uncompetitive (High HHI)" ~ 1L,
+    hhi_group == "Competitive (Low HHI)" ~ 0L,
+    TRUE ~ NA_integer_
   )) %>%
-  filter(market_type != "Middle") %>%
-  group_by(market_type) %>%
-  summarize(mean_bid = mean(avg_bid, na.rm = TRUE))
+  filter(!is.na(hhi_group))
 
-# Format the table for the report
-bid_comparisons %>%
-  mutate(mean_bid = paste0("$", formatC(mean_bid, format = "f", digits = 2))) %>%
-  rename(`Market Type` = market_type, `Average Bid` = mean_bid) %>%
-  kable()
+# Calculate means by group
+by_group <- bid_comparisons %>%
+  group_by(hhi_group) %>%
+  summarize(
+    `Plan Bid` = mean(bid, na.rm = TRUE),
+    `FFS Cost` = mean(avg_ffscost, na.rm = TRUE),
+    `Medicare Eligibles` = mean(avg_eligibles, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(cols = -hhi_group, names_to = "Variable", values_to = "Value") %>%
+  pivot_wider(names_from = hhi_group, values_from = Value)
+
+# Calculate overall means
+overall <- bid_comparisons %>%
+  summarize(
+    `Plan Bid` = mean(bid, na.rm = TRUE),
+    `FFS Cost` = mean(avg_ffscost, na.rm = TRUE),
+    `Medicare Eligibles` = mean(avg_eligibles, na.rm = TRUE)
+  ) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Overall")
+
+# Join together
+balance_table <- by_group %>%
+  left_join(overall, by = "Variable") %>%
+  mutate(across(where(is.numeric), ~ case_when(
+    Variable == "Medicare Eligibles" ~ scales::comma(.x, accuracy = 1),
+    TRUE ~ scales::dollar(.x, accuracy = 0.01)
+  )))
+
+# Knitr Table
+knitr::kable(balance_table,
+             digits = 2,
+             format.args = list(big.mark = ","))
 ```
 
-{{< pagebreak >}}
+According to @tbl-bid-comparison, the mean bids are slightly higher in uncompetitive markets (high HHI) than competitive markets (low HHI), which may indicate lower competitive pressure and more freedom to exercise market power to charge higher prices for enrollees. Going back to the argument of geographical disparities, rural areas tend to have fewer beneficiaries, which increases the risk of adverse selection from these relatively small risk pools.
+
+Interestingly though, FFS costs are lower in concentrated markets compared to competitive markets. This suggests that, while insurers in competitive markets are submitting lower bids towards the actual cost of care to offer extra, more enticing benefits for beneficiaries, insurers in uncompetitive markets, with no market rivals to undercut them, are submitting higher bids to pocket a greater share of Medicare benchmarks as profit. Consequently, costs are passed onto the beneficiaries, which may help to explain, in part, the health disparities observed in sparsely populated areas compared to densely populated ones.
 
 # Question 6 
 
 ```{r}
+#| label: tbl-ffs-buckets
+#| tbl-cap: "Average Bids by FFS Cost Quartile and Market Competition"
 #| message: false
 #| warning: false
 
-# Filter for 2018 and calculate HHI ---------------------------------------
-hhi_2018 <- final_ma %>%
-  filter(year == 2018) %>%
-  group_by(fips, parent_org) %>%
-  summarize(org_enroll = sum(avg_enrollment, na.rm = TRUE), .groups = "drop_last") %>%
+# Create buckets based on FFS cost quartiles ---------------------------
+ffs_qs <- quantile(bid_comparisons$avg_ffscost, probs = c(0.25, 0.50, 0.75), na.rm = TRUE)
+
+bid_comparisons <- bid_comparisons %>%
   mutate(
-    county_enrollment = sum(org_enroll, na.rm = TRUE),
-    ma_share = (org_enroll/county_enrollment) * 100) %>%
-  summarize(hhi = sum(ma_share^2, na.rm = TRUE), .groups = "drop")
+    ffs_q1 = if_else(avg_ffscost < ffs_qs[1], 1, 0),
+    ffs_q2 = if_else(avg_ffscost >= ffs_qs[1] & avg_ffscost < ffs_qs[2], 1, 0),
+    ffs_q3 = if_else(avg_ffscost >= ffs_qs[2] & avg_ffscost < ffs_qs[3], 1, 0),
+    ffs_q4 = if_else(avg_ffscost >= ffs_qs[3], 1, 0)
+  ) %>%
+  filter(!is.na(treated))
 
-
-# Merge HHI with the rest of the data -------------------------------------
-final_2018 <- final_ma %>%
-  filter(year == 2018) %>%
-  left_join(hhi_2018, by = "fips") %>%
-  filter(!is.na(bid))
-
-# Quantiles of HHI --------------------------------------------------------
-q_hhi <- quantile(hhi_2018$hhi, probs = c(0.33, 0.66), na.rm = TRUE)
-
-
-# Define treatment: high (33rd) vs low HHI (66th) -------------------------
-final_2018 <- final_2018 %>%
-  mutate(market_type = case_when(
-    hhi <= q_hhi[1] ~ "Competitive (Low HHI)",
-    hhi >= q_hhi[2] ~ "Uncompetitive (High HHI)",
-    TRUE ~ "Middle"
+# Create the summary table
+q6_summary_table <- bid_comparisons %>%
+  mutate(ffs_quartile = case_when(
+    ffs_q1 == 1 ~ "Quartile 1 (Low Cost)",
+    ffs_q2 == 1 ~ "Quartile 2",
+    ffs_q3 == 1 ~ "Quartile 3",
+    ffs_q4 == 1 ~ "Quartile 4 (High Cost)"
   )) %>%
-  filter(market_type != "Middle")
-
-
-# Create indicators based on FFS cost quartiles ---------------------------
-final_2018 <- final_2018 %>%
-  mutate(ffs_quartile = ntile(avg_ffscost, 4)) %>%
-  mutate(
-    ffs_q1 = ifelse(ffs_quartile == 1, 1, 0),
-    ffs_q2 = ifelse(ffs_quartile == 2, 1, 0),
-    ffs_q3 = ifelse(ffs_quartile == 3, 1, 0),
-    ffs_q4 = ifelse(ffs_quartile == 4, 1, 0)
-  )
-
-# Create summary table -------------------------------------------------------------------
-q6_summary_table <- final_2018 %>%
-  filter(!is.na(ffs_quartile)) %>%
-  group_by(ffs_quartile, market_type) %>%
+  group_by(ffs_quartile, hhi_group) %>%
   summarize(mean_bid = mean(bid, na.rm = TRUE), .groups = "drop") %>%
-  pivot_wider(names_from = market_type, values_from = mean_bid) %>%
-  mutate(across(c(`Competitive (Low HHI)`, `Uncompetitive (High HHI)`), 
-                ~ scales::dollar(.x, accuracy = 0.01)))
+  pivot_wider(names_from = hhi_group, values_from = mean_bid) %>%
+  mutate(across(where(is.numeric), ~ scales::dollar(.x, accuracy = 0.01)))
 
-
-# Display table -----------------------------------------------------------
-knitr::kable(q6_summary_table, 
-             caption = "Average Bids by FFS Cost Quartile and Competition Level (2018)",
-             col.names = c("FFS Quartile", "Competitive (Low HHI)", "Uncompetitive (High HHI)"))
+# Knitr table
+knitr::kable(q6_summary_table,
+             col.names = c("FFS Cost Quartile", "Competitive (Low HHI)", "Uncompetitive (High HHI)"))
 ```
+
+According to @tbl-ffs-buckets, bids in quartile 1, which includes counties with the lowest FFS costs, are highest out of all other quartiles. This challenges initial expectations that insurers in counties with the lowest FFS costs will submit lower bids. However, it also corroborates the assumption that insurers submit higher bids as a cushion between high Benchmarks and low healthcare costs to capture more profit.
+
+It would be counterintuitive to submit higher bids in quartile 4, which includes counties with the highest FFS costs, than quartile 1 since there would be less rebates to return to the beneficiary, especially in competitive markets where there is more financial incentive to keep plans attractive. To have a competitive rebate margin, submitting efficient bids is necessary, though this is not reflected in uncompetitive markets, where insurers have more market power to submit higher bids regardless of FFS costs.
 
 # Question 7
 
-```{r}
-# Clean subset for question 7 ---------------------------------------------
-q7_data <- final_2018 %>%
-  filter(!is.na(ffs_quartile)) %>%
-  mutate(treated = ifelse(market_type == "Competitive (Low HHI)", 1, 0))
+```{r, message = FALSE, warning = FALSE}
+#| label: tbl-ate
+#| tbl-cap: "ATE Estimates"
+#| warning: false
+#| message: false
+#| echo: false
+
+bid_comparisons <- bid_comparisons %>%
+  ungroup()
+
+# De-mean interactions for OLS ATE
+bid_comparisons <- bid_comparisons %>%
+  mutate(
+    int_q1 = treated * (ffs_q1 - mean(ffs_q1, na.rm = TRUE)),
+    int_q2 = treated * (ffs_q2 - mean(ffs_q2, na.rm = TRUE)),
+    int_q3 = treated * (ffs_q3 - mean(ffs_q3, na.rm = TRUE))
+  )
+
+# Covariate matrix
+q7_data <- bid_comparisons %>%
+  select(ffs_q1, ffs_q2, ffs_q3) # leave one out to avoid collinearity
 
 
-# Load Matching package ---------------------------------------------------
+# Load Matching package
 if (!require("Matching")) install.packages("Matching")
 library("Matching")
 
 
-# 1-to-1 matching with inverse variance distance --------------------------
-m.nn.var <- Match(Y = q7_data$bid,
-                  Tr = q7_data$treated,
-                  X = q7_data$ffs_quartile,
+# 1-to-1 matching with inverse variance distance
+sink(tempfile())
+m.nn.var <- Match(Y = bid_comparisons$bid,
+                  Tr = bid_comparisons$treated,
+                  X = q7_data,
                   M = 1,
                   Weight = 1,
                   estimand = "ATE",
-                  version = "fast",
-                  ties = FALSE)
+                  ties = TRUE)
 
 ate_inv <- m.nn.var$est
 
 
-# 1-to-1 matching with Mahalanobis distance -------------------------------
-m.nn.md <- Match(Y = q7_data$bid,
-                 Tr = q7_data$treated,
-                 X = q7_data$ffs_quartile,
+# 1-to-1 matching with Mahalanobis distance
+m.nn.md <- Match(Y = bid_comparisons$bid,
+                 Tr = bid_comparisons$treated,
+                 X = q7_data,
                  M = 1,
                  Weight = 2,
                  estimand = "ATE",
-                 version = "fast",
-                 ties = FALSE)
+                 ties = TRUE)
 
 ate_md <- m.nn.md$est
+sink()
 
-
-# Load WeightIt package ---------------------------------------------------
+# Load WeightIt package
 if (!require("WeightIt")) install.packages("WeightIt")
 library(WeightIt)
 
 
-# Inverse propensity scoring ----------------------------------------------
-logit.model <- glm(treated ~ as.factor(ffs_quartile),
+# Inverse propensity scoring
+logit.model <- glm(treated ~ ffs_q1 + ffs_q2 + ffs_q3,
                    family = binomial,
-                   data = q7_data)
+                   data = bid_comparisons)
 
-q7_data$ps <- fitted(logit.model)
+bid_comparisons$ps <- fitted(logit.model)
 
-q7_data <- q7_data %>%
+bid_comparisons <- bid_comparisons %>%
   mutate(ipw = ifelse(treated == 1, 1/ps, 1/(1-ps)))
 
-ipw.model <- lm(bid ~ treated, data = q7_data, weights = ipw)
+ipw.model <- lm(bid ~ treated, data = bid_comparisons, weights = bid_comparisons$ipw)
 ate_ipw <- coef(ipw.model)["treated"]
 
 
-# Simple linear regression ------------------------------------------------
-ols_model <- lm(bid ~ treated * as.factor(ffs_quartile), data = q7_data)
+# Simple linear regression
+ols.model <- lm(bid ~ treated + ffs_q1 + ffs_q2 + ffs_q3 + int_q1 + int_q2 + int_q3, data = bid_comparisons)
+ate_ols <- coef(ols.model)["treated"]
 
-# Predict what bids would be if every county was uncompetitive
-pred_treated <- predict(ols_model, newdata = mutate(q7_data, treated = 1))
+# Extract estimates and SEs
+estimates <- c(ate_inv, ate_md, ate_ipw, ate_ols)
+ses <- c(as.numeric(m.nn.var$se), as.numeric(m.nn.md$se), 
+         as.numeric(sqrt(diag(vcov(ipw.model)))["treated"]), 
+         as.numeric(sqrt(diag(vcov(ols.model)))["treated"]))
 
-# Predict what bids would be if every county was competitive
-pred_control <- predict(ols_model, newdata = mutate(q7_data, treated = 0))
-
-# OLS-based ATE
-ate_ols <- mean(pred_treated - pred_control)
-
-
-# Comparison table -------------------------------------------------------
+# Comparison table
 treatment_comparison <- data.frame(
-  Estimator = c("NN Matching (Inv. Var.)", "NN Matching (Mahalanobis)", 
-                "IPW Weighting", "OLS with Interactions"),
-  ATE = c(ate_inv, ate_md, ate_ipw, ate_ols)
+  Estimator = c("NN Matching (Inv. Var.)", " ", "NN Matching (Mahalanobis)", " ",
+                "IPW Weighting", " ", "OLS with Interactions", " "),
+  ATE = c(scales::dollar(estimates[1]), paste0("(", round(ses[1], 2), ")"),
+          scales::dollar(estimates[2]), paste0("(", round(ses[2], 2), ")"),
+          scales::dollar(estimates[3]), paste0("(", round(ses[3], 2), ")"),
+          scales::dollar(estimates[4]), paste0("(", round(ses[4], 2), ")"))
 )
 
-treatment_comparison %>%
-  mutate(ATE = scales::dollar(ATE, accuracy = 0.01)) %>%
-  knitr::kable(caption = "Table for Question 7: Comparison of ATE Estimators")
+# Knitr table
+knitr::kable(treatment_comparison,
+             align = "lc",
+             escape = FALSE)
 ```
+
+Nevertheless, the average treatment effects (ATE) shown in @tbl-ate highlight that price gouging by insurers in concentrated markets may not be intentionally for profit. While point estimates across all estimators suggest that uncompetitive markets have bids that are \$3.77 higher, when compared with their respective standard errors, the results are statistically indistinguishable from zero. This indicates, then, that structural challenges inherent in concentrated markets, such as higher administrative costs per beneficiary, may play a bigger role in the difference in observed bids than attempts to capture higher revenues.
+
+# Question 8
+
+The ATEs ($3.77) are identical across all estimators in question 7.
 
 # Question 9
 
 ```{r}
+#| label: tbl-continuous
+#| tbl-cap: "OLS Comparisons"
+
 # Question 9: Re-estimate using continuous covariates ---------------------
-q9_model <- lm(bid ~ treated + avg_ffscost + avg_eligibles, data = q7_data)
+q9.model <- lm(bid ~ treated + avg_ffscost + avg_eligibles, data = bid_comparisons)
 
 
-# Extract ATE -------------------------------------------------------------
-ate_q9 <- coef(q9_model)["treated"]
+# Extract ATE and standard error -------------------------------------------------------------
+ate_q7_ols <- coef(ols.model)["treated"]
+se_q7_ols  <- as.numeric(sqrt(diag(vcov(ols.model)))["treated"])
 
+ate_q9_ols <- coef(q9.model)["treated"]
+se_q9_ols  <- as.numeric(sqrt(diag(vcov(q9.model)))["treated"])
 
-# Compare results ---------------------------------------------------------
-q9_comparison <- data.frame(
-  Spec = c("FFS Cost Quartiles (Q7)", "Continuous FFS Costs & Eligibles (Q9)"),
-  `ATE Estimate` = c(ate_ols, ate_q9)
+# Compare results
+ols_comparison <- data.frame(
+  Model = c("OLS Baseline", " ", "OLS Alternate", " "),
+  ATE = c(scales::dollar(ate_q7_ols), paste0("(", round(se_q7_ols, 2), ")"),
+          scales::dollar(ate_q9_ols), paste0("(", round(se_q9_ols, 2), ")"))
 )
 
-# Display table
-knitr::kable(q9_comparison,
-             digits = 2,
-             col.names = c("Model Spec", "ATE ($)"),
-             caption = "Sensitivity Analysis: Quartile vs. Continuous Controls",
-             row.names = FALSE)
+knitr::kable(ols_comparison, align = "lc")
 ```
+
+When controlling for total Medicare beneficiaries in @tbl-continuous, the lack of statistical significance demonstrated in @tbl-ate becomes even more apparent. When the ATE is re-estimated using continuous FFS costs, the causal effect of HHI on bids becomes even smaller compared to the ATEs calculated using discrete FFS cost quartiles.
+
+Ultimately, this suggests that there is no causal relationship between market competition and bids.
+
+# Question 10
+
+Overall, I thought that the process of visualizing data was very fun. Switching from Excel, where I worked with pre-designed plots, to R where I have much more flexibility with designing the charts was exciting. Since I am taking Econometrics alongside this course, much of the conceptual material we learn in class is still very new to me. So, I spend much more time outside of class than my fellow classmates just learning the concepts. However, this assignment taught me that simple plots and histograms don't really tell the whole story and that estimators tell the truth much clearer.
+
+I think a lot of my classmates will agree with me on this when I say that the number of times I had to go back and fix my code was the most aggravating part of the assignment. It should be illegal for a single typo to break an entire block of code. Why R Studio doesn't have a built-in Grammarly (but for code) is something I will never understand. I feel sorry for computer science majors...
